@@ -1,10 +1,9 @@
 const http = require('http');
 
-const PORT = process.env.PORT || 3000;
-const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN;
-const MOYSKLAD_API_TOKEN = process.env.MOYSKLAD_API_TOKEN;
-const PROMO_CODE_ATTRIBUTE_ID = process.env.PROMO_CODE_ATTRIBUTE_ID;
-
+const PORT = process.env['PORT'] || 3000;
+const WEBHOOK_TOKEN = process.env['WEBHOOK_TOKEN'];
+const MOYSKLAD_API_TOKEN = process.env['MOYSKLAD_API_TOKEN'];
+const PROMO_CODE_ATTRIBUTE_ID = process.env['PROMO_CODE_ATTRIBUTE_ID'];
 const DELAY_MS = 60 * 1000; // 1 минута между попытками
 const MAX_ATTEMPTS = 3; // Максимальное количество попыток
 
