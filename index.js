@@ -125,13 +125,13 @@ const server = http.createServer((req, res) => {
         return;
       }
 
-      // Проверка авторизации по токену в теле запроса
-      if (!payload.token || payload.token !== WEBHOOK_TOKEN) {
+      // Проверка авторизации по токену в теле запроса (в корне или внутри body)
+      const incomingToken = payload.token || (payload.body && payload.body.token);
+      if (!incomingToken || incomingToken !== WEBHOOK_TOKEN) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
         return;
       }
-
       const formname = payload.body && payload.body.formname;
       const payment = payload.body && payload.body.payment;
       const promocode = payment && payment.promocode;
