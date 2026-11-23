@@ -100,13 +100,18 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = url.pathname;
 
-  // Healthcheck эндпоинты для хостинга и проверки доступности
-  if (req.method === 'GET' && (pathname === '/' || pathname === '/health')) {
+  // Healthcheck эндпоинты для хостинга и проверки доступности в браузере
+  if (req.method === 'GET' && (pathname === '/' || pathname === '/health' || pathname === '/webhook')) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', service: 'promo-code-webhook', timestamp: new Date().toISOString() }));
+    res.end(JSON.stringify({
+      status: 'ok',
+      service: 'promo-code-webhook',
+      endpoint: '/webhook',
+      method_expected: 'POST',
+      timestamp: new Date().toISOString()
+    }));
     return;
   }
-
   // Обработка вебхука (поддерживаем /webhook и корень /)
   if (req.method === 'POST' && (pathname === '/webhook' || pathname === '/')) {
     let body = '';
