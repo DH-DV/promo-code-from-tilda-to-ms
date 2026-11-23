@@ -98,7 +98,9 @@ async function processOrderInMoySklad(orderId, promocode) {
 }
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const pathname = url.pathname;
+  const pathname = url.pathname.replace(/\/+$/, '') || '/';
+
+  console.log(`[${new Date().toISOString()}] Входящий запрос: ${req.method} ${url.pathname}`);
 
   // Healthcheck эндпоинты для хостинга и проверки доступности в браузере
   if (req.method === 'GET' && (pathname === '/' || pathname === '/health' || pathname === '/webhook')) {
@@ -112,6 +114,7 @@ const server = http.createServer((req, res) => {
     }));
     return;
   }
+
   // Обработка вебхука (поддерживаем /webhook и корень /)
   if (req.method === 'POST' && (pathname === '/webhook' || pathname === '/')) {
     let body = '';
@@ -121,10 +124,13 @@ const server = http.createServer((req, res) => {
     });
 
     req.on('end', () => {
+      console.log(`[${new Date().toISOString()}] Получено тело запроса (длина: ${body.length} байт)`);
+
       let payload;
       try {
         payload = JSON.parse(body);
       } catch (e) {
+        console.error(`[${new Date().toISOString()}] Ошибка парсинга JSON: ${e.message}. Тело: ${body.slice(0, 300)}`);
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid JSON' }));
         return;
@@ -133,14 +139,18 @@ const server = http.createServer((req, res) => {
       // Проверка авторизации по токену в теле запроса (в корне или внутри body)
       const incomingToken = payload.token || (payload.body && payload.body.token);
       if (!incomingToken || incomingToken !== WEBHOOK_TOKEN) {
+        console.warn(`[${new Date().toISOString()}] Ошибка 401 Unauthorized. Ожидался WEBHOOK_TOKEN, получен: "${incomingToken ? '***' : 'отсутствует'}"`);
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
         return;
       }
+
       const formname = payload.body && payload.body.formname;
       const payment = payload.body && payload.body.payment;
       const promocode = payment && payment.promocode;
       const orderid = payment && payment.orderid;
+
+      console.log(`[${new Date().toISOString()}] Данные хука: formname="${formname}", orderid="${orderid}", promocode="${promocode}"`);
 
       // Проверяем условия для обработки заказа
       if (
@@ -154,7 +164,7 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'OK', message: 'Order accepted for processing' }));
 
-        console.log(`Заказ ${orderid} принят в обработку. Запуск цикла поиска в МС (до 3 попыток с интервалом 1 мин)...`);
+        console.log(`[${new Date().toISOString()}] Заказ ${orderid} принят в обработку. Запуск цикла поиска в МС (до 3 попыток с интервалом 1 мин)...`);
 
         // Фоновый запуск обработки с повторными попытками
         processOrderInMoySklad(orderid, promocode);
@@ -162,6 +172,7 @@ const server = http.createServer((req, res) => {
       }
 
       // Если условия не выполнены, возвращаем 200 OK без дальнейшей обработки
+      console.log(`[${new Date().toISOString()}] Запрос пропущен (не Cart или нет промокода): formname="${formname}", promocode="${promocode}"`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'OK', message: 'Skipped: not Cart or no promocode' }));
     });
@@ -169,10 +180,10 @@ const server = http.createServer((req, res) => {
   }
 
   // Неподдерживаемый маршрут или метод
+  console.warn(`[${new Date().toISOString()}] Маршрут не найден: ${req.method} ${pathname}`);
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not Found' }));
 });
-
 server.listen(PORT, () => {
   console.log(`Сервер вебхука запущен на порту ${PORT}`);
 });
