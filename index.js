@@ -4,10 +4,64 @@ const PORT = process.env['PORT'] || 3000;
 const WEBHOOK_TOKEN = process.env['WEBHOOK_TOKEN'];
 const MOYSKLAD_API_TOKEN = process.env['MOYSKLAD_API_TOKEN'];
 const PROMO_CODE_ATTRIBUTE_ID = process.env['PROMO_CODE_ATTRIBUTE_ID'];
+const CUSTOM_ENTITY_ID = process.env['CUSTOM_ENTITY_ID'];
+
 const DELAY_MS = 60 * 1000; // 1 минута между попытками
 const MAX_ATTEMPTS = 3; // Максимальное количество попыток
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Поиск или создание элемента в пользовательском справочнике МойСклад
+ */
+async function getOrCreateCustomEntityElement(entityId, name) {
+  const filterUrl = `https://api.moysklad.ru/api/remap/1.2/entity/customentity/${entityId}?filter=name=${encodeURIComponent(name)}`;
+  
+  const searchRes = await fetch(filterUrl, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${MOYSKLAD_API_TOKEN}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!searchRes.ok) {
+    const errText = await searchRes.text();
+    throw new Error(`Ошибка поиска в справочнике ${entityId}: ${searchRes.status} - ${errText}`);
+  }
+
+  const searchData = await searchRes.json();
+  const existingItem = searchData.rows && searchData.rows.find(row => row.name === name);
+
+  if (existingItem) {
+    console.log(`Элемент справочника найден: "${existingItem.name}" (id: ${existingItem.id})`);
+    return existingItem.meta;
+  }
+
+  // Если не найден — создаём новый элемент
+  console.log(`Элемент "${name}" не найден в справочнике. Создание нового элемента...`);
+  const createUrl = `https://api.moysklad.ru/api/remap/1.2/entity/customentity/${entityId}`;
+  
+  const createRes = await fetch(createUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${MOYSKLAD_API_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: String(name)
+    })
+  });
+
+  if (!createRes.ok) {
+    const errText = await createRes.text();
+    throw new Error(`Ошибка создания элемента справочника "${name}": ${createRes.status} - ${errText}`);
+  }
+
+  const createdItem = await createRes.json();
+  console.log(`Успешно создан новый элемент справочника: "${createdItem.name}" (id: ${createdItem.id})`);
+  return createdItem.meta;
+}
 
 /**
  * Обработка заказа в МойСклад с повторными попытками
@@ -64,15 +118,19 @@ async function processOrderInMoySklad(orderId, promocode) {
         return;
       }
 
+      // Получаем meta элемента справочника (ищем существующий или создаем новый)
+      const entityMeta = await getOrCreateCustomEntityElement(CUSTOM_ENTITY_ID, promocode);
+
       attributes.push({
         meta: {
           href: `https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata/attributes/${PROMO_CODE_ATTRIBUTE_ID}`,
           type: 'attributemetadata',
           mediaType: 'application/json'
         },
-        value: String(promocode)
+        value: {
+          meta: entityMeta
+        }
       });
-
       const updateResponse = await fetch(order.meta.href, {
         method: 'PUT',
         headers: {
