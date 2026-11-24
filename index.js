@@ -6,9 +6,8 @@ const MOYSKLAD_API_TOKEN = process.env['MOYSKLAD_API_TOKEN'];
 const PROMO_CODE_ATTRIBUTE_ID = process.env['PROMO_CODE_ATTRIBUTE_ID'];
 const CUSTOM_ENTITY_ID = process.env['CUSTOM_ENTITY_ID'];
 
-const DELAY_MS = 60 * 1000; // 1 минута между попытками
-const MAX_ATTEMPTS = 3; // Максимальное количество попыток
-
+const DELAY_MS = 3 * 60 * 1000; // 3 минуты между попытками
+const MAX_ATTEMPTS = 5; // До 5 попыток (суммарно до 15 минут ожидания)
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
@@ -68,9 +67,8 @@ async function getOrCreateCustomEntityElement(entityId, name) {
  */
 async function processOrderInMoySklad(orderId, promocode) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    console.log(`Ожидание 1 мин перед попыткой ${attempt}/${MAX_ATTEMPTS} для заказа ${orderId}...`);
+    console.log(`Ожидание 3 мин перед попыткой ${attempt}/${MAX_ATTEMPTS} для заказа ${orderId}...`);
     await sleep(DELAY_MS);
-
     try {
       const url = `https://api.moysklad.ru/api/remap/1.2/entity/customerorder?filter=code=${orderId};externalCode=${orderId}`;
 
@@ -93,9 +91,8 @@ async function processOrderInMoySklad(orderId, promocode) {
         if (attempt === MAX_ATTEMPTS) {
           console.error('ошибка, заказ в МС не найден');
         } else {
-          console.log(`[Попытка ${attempt}/${MAX_ATTEMPTS}] Заказ ${orderId} пока не найден в МС, повтор через 1 минуту...`);
-        }
-        continue;
+          console.log(`[Попытка ${attempt}/${MAX_ATTEMPTS}] Заказ ${orderId} пока не найден в МС, повтор через 3 минуты...`);
+        }        continue;
       }
 
       const order = data.rows[0];
@@ -226,7 +223,7 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'OK', message: 'Order accepted for processing' }));
 
-        console.log(`[${new Date().toISOString()}] Заказ ${orderid} принят в обработку. Запуск цикла поиска в МС (до 3 попыток с интервалом 1 мин)...`);
+        console.log(`[${new Date().toISOString()}] Заказ ${orderid} принят в обработку. Запуск цикла поиска в МС (до 5 попыток с интервалом 3 мин)...`);
 
         // Фоновый запуск обработки с повторными попытками
         processOrderInMoySklad(orderid, promocode);
