@@ -45,6 +45,8 @@ async function processOrderInMoySklad(orderId, promocode) {
       }
 
       const order = data.rows[0];
+      console.log(`[Попытка ${attempt}] Найден заказ в МС для orderid ${orderId}: name="${order.name}", code="${order.code}", externalCode="${order.externalCode}", id="${order.id}"`);
+
       const attributes = Array.isArray(order.attributes) ? [...order.attributes] : [];
 
       const existingAttrIndex = attributes.findIndex(attr => {
@@ -78,11 +80,9 @@ async function processOrderInMoySklad(orderId, promocode) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          meta: order.meta,
           attributes: attributes
         })
       });
-
       if (!updateResponse.ok) {
         const errText = await updateResponse.text();
         console.error(`Ошибка при обновлении заказа ${order.name} в МойСклад: ${updateResponse.status} - ${errText}`);
