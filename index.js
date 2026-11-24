@@ -136,8 +136,10 @@ const server = http.createServer((req, res) => {
         return;
       }
 
-      // Проверка авторизации по токену в теле запроса (в корне или внутри body)
-      const incomingToken = payload.token || (payload.body && payload.body.token);
+      // Полное логирование входящего JSON
+      console.log(`[${new Date().toISOString()}] Входящий JSON запроса:\n${JSON.stringify(payload, null, 2)}`);
+
+      // Проверка авторизации по токену в теле запроса (в корне или внутри body)      const incomingToken = payload.token || (payload.body && payload.body.token);
       if (!incomingToken || incomingToken !== WEBHOOK_TOKEN) {
         console.warn(`[${new Date().toISOString()}] Ошибка 401 Unauthorized. Ожидался WEBHOOK_TOKEN, получен: "${incomingToken ? '***' : 'отсутствует'}"`);
         res.writeHead(401, { 'Content-Type': 'application/json' });
