@@ -139,7 +139,8 @@ const server = http.createServer((req, res) => {
       // Полное логирование входящего JSON
       console.log(`[${new Date().toISOString()}] Входящий JSON запроса:\n${JSON.stringify(payload, null, 2)}`);
 
-      // Проверка авторизации по токену в теле запроса (в корне или внутри body)      const incomingToken = payload.token || (payload.body && payload.body.token);
+      // Проверка авторизации по токену в теле запроса (в корне или внутри body)
+      const incomingToken = payload.token || (payload.body && payload.body.token);
       if (!incomingToken || incomingToken !== WEBHOOK_TOKEN) {
         console.warn(`[${new Date().toISOString()}] Ошибка 401 Unauthorized. Ожидался WEBHOOK_TOKEN, получен: "${incomingToken ? '***' : 'отсутствует'}"`);
         res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -147,13 +148,14 @@ const server = http.createServer((req, res) => {
         return;
       }
 
-      const formname = payload.body && payload.body.formname;
-      const payment = payload.body && payload.body.payment;
+      // Данные могут приходить как в корне payload, так и внутри payload.body
+      const data = (payload.body && typeof payload.body === 'object') ? payload.body : payload;
+      const formname = data.formname;
+      const payment = data.payment;
       const promocode = payment && payment.promocode;
       const orderid = payment && payment.orderid;
 
       console.log(`[${new Date().toISOString()}] Данные хука: formname="${formname}", orderid="${orderid}", promocode="${promocode}"`);
-
       // Проверяем условия для обработки заказа
       if (
         formname === 'Cart' &&
